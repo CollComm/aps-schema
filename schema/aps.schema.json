@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.com/schemas/aps/2.0.2",
+  "$id": "https://schemas.gi-t.com/aps/2.0.2",
   "title": "Agent Performance Script (APS)",
   "description": "Schema v2.0.2 for agent-generated multimodal performance outputs in social games. Uses draft 2020-12 features like $defs and oneOf for clearer action definitions. Supports decentralized identity, parallel actions, custom actions, and dependencies.",
   "$comment": "Version 2.0.2 incorporates validation improvements (disallowed root unevaluated properties, refined mutual exclusivity descriptions, non-zero duration default) and adds starter enum examples based on feedback. For detailed usage examples, validation scenarios, implementation guidance (timing precedence, position state tracking, template interactions, coordinate units, axis order), and suggested enum values, please refer to accompanying documentation linked from $id.",
