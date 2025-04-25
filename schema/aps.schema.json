@@ -1,0 +1,443 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/aps/2.0.2",
+  "title": "Agent Performance Script (APS)",
+  "description": "Schema v2.0.2 for agent-generated multimodal performance outputs in social games. Uses draft 2020-12 features like $defs and oneOf for clearer action definitions. Supports decentralized identity, parallel actions, custom actions, and dependencies.",
+  "$comment": "Version 2.0.2 incorporates validation improvements (disallowed root unevaluated properties, refined mutual exclusivity descriptions, non-zero duration default) and adds starter enum examples based on feedback. For detailed usage examples, validation scenarios, implementation guidance (timing precedence, position state tracking, template interactions, coordinate units, axis order), and suggested enum values, please refer to accompanying documentation linked from $id.",
+  "type": "object",
+  "required": ["utterance_id", "intent", "script"],
+  "properties": {
+    "utterance_id": {
+      "type": "string",
+      "description": "Unique identifier for this utterance/action sequence."
+    },
+    "script_template_id": {
+        "type": "string",
+        "description": "Optional: Identifier for a predefined script template. If provided, it might influence or override parts of the 'script' array. Specific interaction (e.g., merging, overriding) depends on implementation (refer to documentation). Note: Does not accept null unless type is explicitly changed."
+    },
+    "text": {
+      "type": "string",
+      "description": "Optional high-level summary of the utterance. Primarily useful if the 'script' array lacks specific 'speak' actions or for top-level logging/debugging purposes. If detailed 'speak' actions are present in the script, this field may be omitted. Note: Does not accept null unless type is explicitly changed."
+    },
+    "intent": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Primary strategic intent(s) behind this line. Always use array format.",
+      "examples": [
+          ["accusation"],
+          ["defense", "deflection"]
+      ]
+    },
+    "sub_intent": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["type", "value"],
+            "properties": {
+              "type": { "type": "string", "description": "Type of sub-intent (e.g., 'emotion', 'mannerism', 'social_tactic')." },
+              "value": { "type": "string", "description": "Value of the sub-intent (e.g., 'sarcastic', 'nervous', 'feign_agreement')." }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "description": "Optional nuances, emotional coloring, or secondary goals. Can be a simple string or a structured object. See documentation for more examples.",
+      "examples": [
+          ["sarcastic"],
+          [{"type": "emotion", "value": "nervous"}, {"type": "mannerism", "value": "fidgeting"}]
+      ]
+    },
+    "context": {
+      "$ref": "#/$defs/context"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "positions": {
+      "type": "object",
+      "description": "Optional: Map of agent IDs to their positions in the environment at the time this script was generated. Represents a snapshot; use 'move' actions in the script for dynamic changes. Tracking the updated state resulting from 'move' actions is the responsibility of the consuming application. Useful for spatial awareness in 3D/2D games.",
+      "additionalProperties": {
+        "$ref": "#/$defs/position_data"
+      }
+    },
+    "script": {
+      "type": "array",
+      "description": "Ordered sequence of multimodal actions comprising the agent's performance. Actions can overlap based on 'start_time' and 'duration'. Each item represents a keyframe or action segment.",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/scriptItem"
+      }
+    }
+  },
+  "examples": [
+    {
+      "utterance_id": "ex001",
+      "intent": ["query"],
+      "metadata": { "version": "2.0.2" },
+      "script": [
+        {
+          "action_id": "act1",
+          "action": "speak",
+          "text": "Is anyone suspicious?",
+          "start_time": 0.0,
+          "duration": 2.5
+        },
+        {
+          "action_id": "act2",
+          "action": "gaze",
+          "target": "group_center",
+          "start_time": 0.5,
+          "duration": 2.0,
+          "depends_on": ["act1"]
+        }
+      ]
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "context": {
+      "type": "object",
+      "properties": {
+        "game_phase": {
+          "type": "string",
+          "description": "Current phase of the game. Examples: 'day_discussion', 'night_phase', 'voting', 'role_reveal'. See docs for full ontology or extension patterns."
+        },
+        "round_number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Current round or day number within the game (starting from 1)."
+        },
+        "additional_context": {
+            "type": "object",
+            "description": "Optional field for any other relevant game state information (e.g., current player turn, available actions).",
+            "additionalProperties": true
+        }
+      },
+      "description": "Structured game context for this script.",
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+     "metadata": {
+      "type": "object",
+      "description": "Optional metadata related to this action sequence.",
+      "properties": {
+        "version": {
+            "type": "string",
+            "const": "2.0.2",
+            "description": "Version of the APS schema this instance conforms to."
+        },
+        "agent_id": {
+          "type": "string",
+          "description": "Globally unique identifier for the agent performing the action. May optionally be linked to a decentralized or blockchain-based identity."
+        },
+        "game_instance_id": {
+            "type": "string",
+            "description": "Optional: Unique identifier for the specific game instance or match this script belongs to."
+        },
+        "session_id": {
+            "type": "string",
+            "description": "Optional: Identifier for the user session or interaction sequence."
+        },
+        "agent_identity_method": {
+          "type": "string",
+          "enum": ["centralized", "blockchain", "DID", "other", "unknown"],
+          "description": "Optional: Specifies the identity scheme used."
+        },
+        "agent_public_key": {
+          "type": "string",
+          "description": "Optional: Cryptographic public key associated with the agent (e.g., for blockchain/DID verification). Keys can be long; ensure storage accommodates typical lengths. Consider base64 encoding.",
+          "contentEncoding": "base64"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp when the action sequence was generated or initiated (ISO 8601 format recommended)."
+         },
+        "generated_by": {
+          "type": "string",
+          "description": "Identifier for the model or system that generated this script (e.g., 'GPT-4-Agent-Controller:v1.2')."
+        }
+      },
+      "required": ["version"],
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "position_data": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "units": {
+            "type": "string",
+            "description": "Optional: Specifies the units for x, y, z (e.g., 'meters', 'unity_units'). Define convention in documentation.",
+            "default": "meters"
+        },
+        "coordinate_system": {
+            "type": "string",
+            "enum": ["world", "relative_to_self", "relative_to_target"],
+            "default": "world",
+            "description": "Coordinate system reference. Defaults to 'world'. Note: 'default' is a hint; implementation must handle omission."
+        },
+        "facing_direction": {
+           "type": "object",
+           "properties": {
+                "yaw": { "type": "number", "description": "Rotation around the vertical axis." },
+                "pitch": { "type": "number", "description": "Rotation around the side-to-side axis." },
+                "roll": { "type": "number", "description": "Rotation around the front-to-back axis." }
+           },
+           "description": "Facing direction (e.g., Euler angles). Units (degrees/radians) and axis order (e.g., Y-up/Z-up) should be defined in documentation.",
+           "additionalProperties": false
+        },
+        "facing_target": {
+            "type": "string",
+            "description": "Optional: ID of an object or agent to face towards."
+        }
+      },
+      "description": "Spatial coordinates and orientation data. Cannot specify both facing_direction and facing_target.",
+      "not": {
+          "required": ["facing_direction", "facing_target"]
+      },
+      "unevaluatedProperties": false
+    },
+    "voice_config": {
+      "type": "object",
+      "properties": {
+        "tone": {
+          "type": "string",
+          "description": "Vocal tone (e.g., 'serious', 'playful', 'urgent')."
+        },
+        "pacing": {
+          "type": "string",
+          "enum": ["very_slow", "slow", "medium", "fast", "very_fast"],
+          "description": "Speaking pace."
+        },
+        "emotion": {
+          "type": "string",
+          "description": "Primary emotion to convey (e.g., 'anger', 'joy'). Should align with 'emotion_model'."
+        },
+        "emotion_intensity": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 0.5,
+            "description": "Intensity of the expressed emotion [0.0, 1.0]. Defaults to 0.5 (hint)."
+        },
+        "accent": {
+          "type": "string",
+          "description": "Speech accent (e.g., 'British RP', 'General American')."
+        },
+        "volume": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 0.8,
+          "description": "Voice loudness [0.0, 1.0]. Defaults to 0.8 (hint)."
+        },
+        "personality_trait": {
+          "type": "string",
+          "description": "Dominant personality trait influencing delivery (e.g., 'confident', 'shy')."
+        },
+        "affect": {
+          "type": "string",
+          "description": "Specific affective style applied (e.g., 'sarcastic', 'enthusiastic')."
+        },
+        "emphasis": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Optional: List of words/phrases within the 'text' to emphasize."
+        },
+        "emotion_model": {
+          "type": "string",
+          "description": "Optional: The emotional taxonomy used (e.g., 'Ekman', 'Plutchik', 'Valence-Arousal'). Helps interpret 'emotion'. See documentation for guidance."
+        },
+        "voice_preset": {
+            "type": "string",
+            "description": "Optional: Identifier for a pre-configured voice profile. If provided, it typically overrides other specific settings (like tone, accent). Check implementation documentation for exact precedence rules."
+        }
+      },
+      "description": "Detailed configuration for voice synthesis delivery.",
+      "unevaluatedProperties": false
+    },
+    "commonActionProperties": {
+        "type": "object",
+        "properties": {
+            "action_id": {
+                "type": "string",
+                "description": "Optional unique identifier for this specific action within the script. Used for referencing in dependencies. Uniqueness across script must be enforced at runtime.",
+                "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "target": {
+                "type": "string",
+                "description": "Identifier of the target agent or object for the action (e.g., 'player_3', 'center_table', 'self'). Takes precedence over 'direction'."
+            },
+            "direction": {
+                "type": "string",
+                "description": "Direction of the action if no specific target is provided (e.g., 'left', 'towards:player_3'). Ignored if 'target' is specified."
+            },
+            "intensity": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "default": 0.5,
+                "description": "Intensity of the action [0.0, 1.0]. Defaults to 0.5 (hint)."
+            },
+            "start_time": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Optional absolute start time (seconds) relative to utterance start. Allows parallel actions. Overrides 'timing_offset' if both are present."
+            },
+            "duration": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "default": 0.1,
+                "description": "Duration of the action (seconds). Must be greater than 0. Defaults to 0.1 (hint) if omitted."
+            },
+            "timing_offset": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Optional relative delay (seconds) from the end of the previous action in the array. Used for sequential timing. Ignored if 'start_time' is present."
+            },
+            "depends_on": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+                "uniqueItems": true,
+                "description": "Optional: List of 'action_id's from previous actions that must complete before this action starts. Reference integrity is checked at runtime."
+            },
+            "confidence": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "Optional: Confidence score [0.0, 1.0] from the generating model."
+            },
+            "generated_by_model": {
+                "type": "string",
+                "description": "Optional: Specific model/component that generated this action."
+            }
+        },
+        "description": "Common properties for all script actions. Cannot specify both start_time and timing_offset.",
+        "not": {
+            "required": ["start_time", "timing_offset"]
+        },
+        "unevaluatedProperties": false
+    },
+    "scriptItem": {
+        "oneOf": [
+            { "$ref": "#/$defs/gazeAction" },
+            { "$ref": "#/$defs/leanAction" },
+            { "$ref": "#/$defs/speakAction" },
+            { "$ref": "#/$defs/gestureAction" },
+            { "$ref": "#/$defs/expressionAction" },
+            { "$ref": "#/$defs/postureChangeAction" },
+            { "$ref": "#/$defs/moveAction" },
+            { "$ref": "#/$defs/customAction" }
+        ],
+        "description": "A single action keyframe within the performance script."
+    },
+    "gazeAction": {
+        "type": "object",
+        "allOf": [ { "$ref": "#/$defs/commonActionProperties" } ],
+        "properties": { "action": { "const": "gaze" } },
+        "required": ["action"],
+        "unevaluatedProperties": false
+    },
+    "leanAction": {
+        "type": "object",
+        "allOf": [ { "$ref": "#/$defs/commonActionProperties" } ],
+        "properties": { "action": { "const": "lean" } },
+        "required": ["action"],
+        "unevaluatedProperties": false
+    },
+    "speakAction": {
+        "type": "object",
+        "allOf": [ { "$ref": "#/$defs/commonActionProperties" } ],
+        "properties": {
+            "action": { "const": "speak" },
+            "text": {
+                "type": "string",
+                "description": "Text content for the 'speak' action."
+            },
+            "voice_config": {
+                "$ref": "#/$defs/voice_config"
+            }
+        },
+        "required": ["action", "text"],
+        "unevaluatedProperties": false
+    },
+    "gestureAction": {
+        "type": "object",
+        "allOf": [ { "$ref": "#/$defs/commonActionProperties" } ],
+        "properties": {
+            "action": { "const": "gesture" },
+            "gesture_type": {
+                "type": "string",
+                "description": "Specific type of gesture. Examples: 'point_accusingly', 'shrug', 'wave'. See documentation for suggested common values or extension patterns."
+            }
+        },
+        "required": ["action", "gesture_type"],
+        "unevaluatedProperties": false
+    },
+    "expressionAction": {
+        "type": "object",
+        "allOf": [ { "$ref": "#/$defs/commonActionProperties" } ],
+        "properties": {
+            "action": { "const": "expression" },
+            "expression": {
+                "type": "string",
+                "description": "Label for the facial expression. Examples: 'smile', 'frown', 'skeptical'. See documentation for suggested common values or extension patterns."
+            }
+        },
+        "required": ["action", "expression"],
+        "unevaluatedProperties": false
+    },
+    "postureChangeAction": {
+        "type": "object",
+        "allOf": [ { "$ref": "#/$defs/commonActionProperties" } ],
+        "properties": {
+            "action": { "const": "posture_change" },
+            "pose": {
+                "type": "string",
+                "description": "Description of the target full-body posture (e.g., 'standing_arms_crossed')."
+            }
+        },
+        "required": ["action", "pose"],
+        "unevaluatedProperties": false
+    },
+    "moveAction": {
+        "type": "object",
+        "allOf": [ { "$ref": "#/$defs/commonActionProperties" } ],
+        "properties": {
+            "action": { "const": "move" },
+            "position": {
+                "$ref": "#/$defs/position_data",
+                "description": "Target spatial position or movement parameters."
+            }
+        },
+        "required": ["action", "position"],
+        "unevaluatedProperties": false
+    },
+    "customAction": {
+        "type": "object",
+        "allOf": [ { "$ref": "#/$defs/commonActionProperties" } ],
+        "properties": {
+            "action": { "const": "custom" },
+            "custom_action_type": {
+                "type": "string",
+                "description": "Specifies the type of the custom action (e.g., 'whistle', 'use_item')."
+            },
+            "custom_action_params": {
+                "type": "object",
+                "description": "Parameters for the custom action.",
+                "additionalProperties": true
+            }
+        },
+        "required": ["action", "custom_action_type"],
+        "unevaluatedProperties": false
+    }
+  }
+}
